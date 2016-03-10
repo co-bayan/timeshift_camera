@@ -3,7 +3,10 @@ package com.cobayasu.memorycapture;
 import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.ContentValues;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.hardware.Camera;
+import android.media.Image;
 import android.os.Environment;
 import android.os.Bundle;
 import android.provider.MediaStore.Images;
@@ -24,13 +27,17 @@ import java.util.Calendar;
 
 public class CameraActivity extends Activity {
 
-    //Layout Parameter
+    //Layout parameter
     private final int WC = ViewGroup.LayoutParams.WRAP_CONTENT;
     //Camera instance
     private Camera mCam = null;
-
-    //Camera Preview
+    //Camera preview
     private CameraPreview mCameraPreview = null;
+    //Guide image instance
+    private Bitmap guideBmp;
+    private ImageView guideImg;
+    //Transparent ratio
+    private final int TRANSPARENT_RATIO = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -140,5 +147,45 @@ public class CameraActivity extends Activity {
         values.put(Images.Media.MIME_TYPE, "image/jpeg");
         values.put("_data", path);
         contentResolver.insert(Images.Media.EXTERNAL_CONTENT_URI, values);
+    }
+
+    //Get guide image that overlays preview
+    private Bitmap getGuideImg() {
+        Bitmap srcBmp = BitmapFactory.decodeResource(getResources(), R.drawable.sample);
+        if (!srcBmp.isMutable()) {
+            srcBmp = srcBmp.copy(Bitmap.Config.ALPHA_8, true);
+        }
+
+        int width = srcBmp.getWidth();
+        int height = srcBmp.getHeight();
+
+        int[] pixels = new int[width * height];
+        srcBmp.getPixels(pixels, 0 ,width, 0, 0, width, height);
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                //Get transparent ratio from pixel info
+                int alpha = pixels[x + y * width];
+                alpha = alpha >>> 24;
+
+                if (alpha > TRANSPARENT_RATIO) {
+                    alpha -= 100;
+                } else {
+                    alpha = 0;
+                }
+                alpha = alpha << 24;
+
+                //Delete transparent ratio from pixel info
+
+                int color = pixels[x + y * width];
+                color = color << 8;
+                color = color >>> 8;
+
+                //Merge transparent ratio with color into pixel info
+                pixels[x + y * width] = alpha ^ color;
+            }
+        }
+        srcBmp.setPixels(pixels, 0, width, 0, 0, width, height);
+        return srcBmp;
     }
 }
